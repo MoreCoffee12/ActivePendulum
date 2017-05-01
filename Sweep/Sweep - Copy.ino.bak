@@ -1,0 +1,93 @@
+#include <Servo.h>
+
+#define __iRows 256
+
+#define PINFREQUP 13
+#define PINFREQDN 12
+
+Servo myservo;  // create servo object to control a servo
+// twelve servo objects can be created on most boards
+
+// Look up table
+const float pi = 3.141592653589793;
+int iT = 0;
+int iStep = -5;
+byte bSync = 0;
+double dTable[__iRows];
+
+void setup() {
+
+  // Configure the look up table
+  for( iT = 0; iT<256; ++iT){
+    dTable[iT] = 50*sin(2*pi*(float)iT/256.0)+82;
+  }
+
+  Serial.begin(115200);
+  delay(50);
+  Serial.println(dTable[0]);
+  Serial.println(dTable[63]);
+  Serial.println(dTable[127]);
+  Serial.println(dTable[191]);
+  Serial.println("<-------------------------->");
+  
+  // configure the ADC input pin
+  pinMode(A0, INPUT);
+
+  // configure the button pins
+  pinMode(PINFREQUP, INPUT_PULLUP);   
+  pinMode(PINFREQDN, INPUT_PULLUP);   
+
+  // attaches the servo on pin 9 to the servo object
+  myservo.attach(9);  
+
+  // Set timer0 interrupt.
+  TCCR0A = 0;   // Set entire TCCR0A register to 0
+  TCCR0B = 0;   // Same for TCCR0B
+
+  // See "ISR Frequency Ranges.xlsx" for details
+  OCR0A = 75;  
+  
+  // Turn on the CTC mode
+  TCCR0A |= (1 << WGM01);
+  // Set CS02, CS01 and CS00 bits for 256 prescaler
+  TCCR0B |= (1 << CS02 )|(1 << CS00);
+  // Enable the timer compare interrupt
+  TIMSK0 |= ( 1 << OCIE0A );
+  
+  // enable interrupts
+  //sei();
+
+}
+
+void loop() {
+
+  // Increase frequency (decrease register)
+  if( digitalRead(PINFREQUP) == LOW && OCR0A > 10){
+    OCR0A = OCR0A-1;
+    Serial.println(OCR0A);
+    delay(1000);
+  }
+
+  // Decrease frequency (increase register)
+  if( digitalRead(PINFREQDN) == LOW && OCR0A < 255){
+    OCR0A = OCR0A+1;
+    Serial.println(OCR0A);
+    delay(1000);
+  }
+
+  Serial.println("Loop");
+  delay(1000);
+}
+
+ISR(TIMER0_COMPA_vect){
+  
+  // tell servo to go to position
+  //myservo.write((int)dTable[bSync]);
+  bSync++;
+
+  //Serial.println(OCR0A);
+
+  //OCR0A = (  analogRead(A0) >>2 );
+
+}
+
