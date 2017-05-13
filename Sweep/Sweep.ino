@@ -3,13 +3,23 @@
 
 #define PINFREQUP 13
 #define PINFREQDN 12
-#define PWMOUT 11
-#define LCDRS 10
+#define PWMOUT 3
+#define LCDRS 8
 #define LCDEN 9
 #define LCD4 4
 #define LCD5 5
 #define LCD6 6
 #define LCD7 7
+
+// define some values used by the panel and buttons
+int lcd_key = 0;
+int adc_key_in = 0;
+#define btnRIGHT 0
+#define btnUP 1
+#define btnDOWN 2
+#define btnLEFT 3
+#define btnSELECT 4
+#define btnNONE 5
 
 // Servo control code and object
 #include <Servo.h>
@@ -75,7 +85,7 @@ void setup() {
   
   // Turn on the CTC mode
   TCCR0A |= (1 << WGM01);
-  // Set CS02, CS01 and CS00 bits for 256 prescaler
+  // Set CS02, CS01 and CS00 bits for 1024 prescaler
   TCCR0B |= (1 << CS02 )|(1 << CS00);
   // Enable the timer compare interrupt
   TIMSK0 |= ( 1 << OCIE0A );
@@ -89,10 +99,10 @@ void loop() {
 
 
   // Get current state of up pin
-  iReading = digitalRead(PINFREQUP);
+  iReading = read_LCD_buttons();
 
   // Increase frequency (decrease register)
-  if( iReading == LOW && iLastUp == HIGH && OCR0A > 10){
+  if( iReading == btnUP && iLastUp == HIGH && OCR0A > 10){
     iLastUp = LOW;
     OCR0A = OCR0A-1;
     Serial.println(OCR0A);
@@ -100,15 +110,12 @@ void loop() {
     lcd.print(dCalcFreq(OCR0A), 3);
     lcd.print(" Hz");
   }
-  if( iReading == HIGH && iLastUp == LOW ){
+  if( iReading == btnNONE && iLastUp == LOW ){
     iLastUp = HIGH;
   }
 
-  // Get current state of down pin
-  iReading = digitalRead(PINFREQDN);
-
   // Decrease frequency (increase register)
-  if(iReading == LOW && iLastDn == HIGH &&  OCR0A < 255){
+  if(iReading == btnDOWN && iLastDn == HIGH &&  OCR0A < 255){
     iLastDn = LOW;
     OCR0A = OCR0A+1;
     Serial.println(OCR0A);
@@ -116,7 +123,7 @@ void loop() {
     lcd.print(dCalcFreq(OCR0A), 3);
     lcd.print(" Hz");
   }
-  if( iReading == HIGH && iLastDn == LOW ){
+  if( iReading == btnNONE && iLastDn == LOW ){
     iLastDn = HIGH;
   }
 
@@ -138,5 +145,22 @@ float dCalcFreq(int iRegVal){
   dTemp = 15625/((float)OCR0A + 1.0);
   return dTemp/((float)__iRows);
 
+}
+
+// read the buttons
+int read_LCD_buttons()
+{
+  adc_key_in = analogRead(0); // read the value from the sensor
+  
+  // my buttons when read are centered at these valies: 0, 144, 329, 504, 741
+  // we add approx 50 to those values and check to see if we are close
+  // We make this the 1st option for speed reasons since it will be the most likely result
+  if (adc_key_in > 1000) return btnNONE; 
+  if (adc_key_in < 50) return btnRIGHT;
+  if (adc_key_in < 195) return btnUP;
+  if (adc_key_in < 380) return btnDOWN;
+  if (adc_key_in < 555) return btnLEFT;
+  if (adc_key_in < 790) return btnSELECT;
+  return btnNONE; // when all others fail, return this...
 }
 
