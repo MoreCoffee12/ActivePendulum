@@ -41,7 +41,9 @@ double dTable[__iRows];
 // Variables related to the buttons
 unsigned int iLastUp = HIGH;
 unsigned int iLastDn = HIGH;
+unsigned int iLast = btnNONE;
 unsigned int iReading;   
+bool bRun = true;
 
 // Others
 float dTemp;
@@ -52,10 +54,11 @@ void setup() {
   lcd.begin(16, 2);
   // Print a message to the LCD.
   lcd.print("Pendulum Driver");
+  lcd.print("Version 1.1");
   
   // Configure the look up table
   for( iT = 0; iT<256; ++iT){
-    dTable[iT] = 50*sin(2*pi*(float)iT/256.0)+82;
+    dTable[iT] = 0*sin(2*pi*(float)iT/256.0)+90;
   }
 
   Serial.begin(115200);
@@ -101,30 +104,37 @@ void loop() {
   // Get current state of up pin
   iReading = read_LCD_buttons();
 
-  // Increase frequency (decrease register)
-  if( iReading == btnUP && iLastUp == HIGH && OCR0A > 10){
-    iLastUp = LOW;
-    OCR0A = OCR0A-1;
-    Serial.println(OCR0A);
-    lcd.begin(16, 2);
-    lcd.print(dCalcFreq(OCR0A), 3);
-    lcd.print(" Hz");
+  if( iReading == btnNONE ){
+    iLast = btnNONE;
   }
-  if( iReading == btnNONE && iLastUp == LOW ){
-    iLastUp = HIGH;
+
+  // Increase frequency (decrease register)
+  if( iReading == btnUP && iLast == btnNONE && OCR0A > 10){
+    //iLastUp = LOW;
+    iLast = btnUP;
+    OCR0A = OCR0A-1;
+    vUpdateDisp();
   }
 
   // Decrease frequency (increase register)
-  if(iReading == btnDOWN && iLastDn == HIGH &&  OCR0A < 255){
-    iLastDn = LOW;
+  if(iReading == btnDOWN && iLast == btnNONE &&  OCR0A < 255){
+    iLast = btnDOWN;
     OCR0A = OCR0A+1;
-    Serial.println(OCR0A);
-    lcd.begin(16, 2);
-    lcd.print(dCalcFreq(OCR0A), 3);
-    lcd.print(" Hz");
+    vUpdateDisp();
   }
-  if( iReading == btnNONE && iLastDn == LOW ){
-    iLastDn = HIGH;
+
+  if( iReading == btnSELECT && iLast == btnNONE ) {
+    iLast = btnSELECT;
+    bRun = !bRun;
+    Serial.println(bRun);
+    if( !bRun ) {
+      lcd.begin(16, 2);
+      lcd.print("Stopped");
+    }
+    else
+    { 
+      vUpdateDisp();
+    }
   }
 
 
@@ -132,12 +142,22 @@ void loop() {
 
 ISR(TIMER0_COMPA_vect){
   
+  if (bRun) {
   // tell servo to go to position
   myservo.write((int)dTable[bSync]);
   bSync++;
+  }
 
   //OCR0A = (  analogRead(A0) >>2 );
 
+}
+
+
+void vUpdateDisp(){
+  Serial.println(OCR0A);
+  lcd.clear();
+  lcd.print(dCalcFreq(OCR0A), 3);
+  lcd.print(" Hz");  
 }
 
 float dCalcFreq(int iRegVal){
