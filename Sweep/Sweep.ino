@@ -35,12 +35,11 @@ LiquidCrystal lcd(LCDRS, LCDEN, LCD4, LCD5, LCD6, LCD7);
 const float pi = 3.141592653589793;
 int iT = 0;
 int iStep = -5;
+int iDC = 90;
 byte bSync = 0;
 double dTable[__iRows];
 
 // Variables related to the buttons
-unsigned int iLastUp = HIGH;
-unsigned int iLastDn = HIGH;
 unsigned int iLast = btnNONE;
 unsigned int iReading;   
 bool bRun = true;
@@ -54,11 +53,12 @@ void setup() {
   lcd.begin(16, 2);
   // Print a message to the LCD.
   lcd.print("Pendulum Driver");
+  lcd.setCursor(0,1);
   lcd.print("Version 1.1");
   
   // Configure the look up table
   for( iT = 0; iT<256; ++iT){
-    dTable[iT] = 0*sin(2*pi*(float)iT/256.0)+90;
+    dTable[iT] = 10*sin(2*pi*(float)iT/256.0);
   }
 
   Serial.begin(115200);
@@ -84,7 +84,7 @@ void setup() {
   TCCR0B = 0;   // Same for TCCR0B
 
   // See "ISR Frequency Ranges.xlsx" for details
-  OCR0A = 75;  
+  OCR0A = 100;  
   
   // Turn on the CTC mode
   TCCR0A |= (1 << WGM01);
@@ -114,6 +114,7 @@ void loop() {
     iLast = btnUP;
     OCR0A = OCR0A-1;
     vUpdateDisp();
+    delay(100);
   }
 
   // Decrease frequency (increase register)
@@ -121,15 +122,19 @@ void loop() {
     iLast = btnDOWN;
     OCR0A = OCR0A+1;
     vUpdateDisp();
+    delay(100);
   }
 
   if( iReading == btnSELECT && iLast == btnNONE ) {
     iLast = btnSELECT;
     bRun = !bRun;
     Serial.println(bRun);
+    delay(100);
     if( !bRun ) {
       lcd.begin(16, 2);
       lcd.print("Stopped");
+      myservo.write(iDC);
+
     }
     else
     { 
@@ -144,7 +149,7 @@ ISR(TIMER0_COMPA_vect){
   
   if (bRun) {
   // tell servo to go to position
-  myservo.write((int)dTable[bSync]);
+  myservo.write((int)dTable[bSync] + iDC);
   bSync++;
   }
 
